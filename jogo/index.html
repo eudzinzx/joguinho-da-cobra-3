@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Jogo da Cobrinha</title>
+  <style>
+    body {
+      background-color: #1e1e1e;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: white;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: start;
+      height: 100vh;
+      padding-top: 20px;
+    }
+
+    canvas {
+      border: 3px solid #00ff99;
+      background-color: #111;
+      box-shadow: 0 0 20px #00ff99;
+      display: none;
+    }
+
+    #menu, #controls {
+      background-color: #2b2b2b;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 15px #00ff99;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+
+    #menu input, #menu select {
+      margin: 8px 0;
+      padding: 8px;
+      font-size: 16px;
+      border-radius: 5px;
+      border: none;
+    }
+
+    #menu label {
+      margin-top: 10px;
+      display: block;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 5px;
+      background-color: #00ff99;
+      border: none;
+      color: #111;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+
+    button:hover {
+      background-color: #00cc77;
+    }
+
+    #score {
+      font-size: 20px;
+      margin-bottom: 10px;
+      display: none;
+      color: #00ff99;
+      font-weight: bold;
+    }
+
+    #controls {
+      display: none;
+    }
+
+    #game-over {
+      color: #ff4d4d;
+      font-size: 26px;
+      margin-top: 10px;
+      display: none;
+    }
+
+    /* Controles de toque */
+    #touch-controls {
+      display: none;
+      margin-top: 15px;
+    }
+
+    #touch-controls button {
+      width: 60px;
+      height: 60px;
+      font-size: 24px;
+      margin: 5px;
+      border-radius: 10px;
+      background-color: #00ff99;
+      border: none;
+      color: #111;
+      cursor: pointer;
+    }
+
+    #touch-controls button:hover {
+      background-color: #00cc77;
+    }
+  </style>
+</head>
+<body>
+  <!-- MENU DE PERSONALIZAÇÃO -->
+  <div id="menu">
+    <h2>🎮 Personalize sua Cobrinha</h2>
+
+    <label for="bodyColor">Cor do Corpo:</label>
+    <select id="bodyColor">
+      <option value="#00cc77">Verde</option>
+      <option value="#ffcc00">Amarelo</option>
+      <option value="#ff4d4d">Vermelho</option>
+      <option value="#4da6ff">Azul Claro</option>
+      <option value="#cccccc">Cinza</option>
+      <option value="#ffffff">Branco</option>
+    </select>
+
+    <br />
+    <button onclick="startGame()">Iniciar Jogo</button>
+  </div>
+
+  <!-- CONTROLES DO JOGO -->
+  <div id="controls">
+    <div id="score">Pontuação: 0</div>
+    <button onclick="togglePause()">Pausar / Continuar</button>
+    <button onclick="returnToMenu()">Voltar ao Menu</button>
+  </div>
+
+  <!-- CANVAS DO JOGO -->
+  <canvas id="game" width="400" height="400"></canvas>
+  <div id="game-over">Game Over! Reiniciando...</div>
+
+  <!-- CONTROLES DE TOQUE -->
+  <div id="touch-controls">
+    <div style="display: flex; justify-content: center;">
+      <button onclick="setDirection('up')">⬆️</button>
+    </div>
+    <div style="display: flex; justify-content: center;">
+      <button onclick="setDirection('left')">⬅️</button>
+      <button onclick="setDirection('down')">⬇️</button>
+      <button onclick="setDirection('right')">➡️</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const box = 20;
+    const totalBoxes = canvas.width / box;
+
+    let snake = [];
+    let direction = "right";
+    let nextDirection = "right";
+    let food, score, gameLoop, isPaused = false;
+
+    let bodyColor = "#00cc77";
+
+    const menu = document.getElementById("menu");
+    const controls = document.getElementById("controls");
+    const scoreDisplay = document.getElementById("score");
+    const gameOverDiv = document.getElementById("game-over");
+    const touchControls = document.getElementById("touch-controls");
+
+    function startGame() {
+      bodyColor = document.getElementById("bodyColor").value;
+
+      menu.style.display = "none";
+      controls.style.display = "block";
+      canvas.style.display = "block";
+      scoreDisplay.style.display = "block";
+      gameOverDiv.style.display = "none";
+      touchControls.style.display = "block";
+
+      snake = [{ x: 8 * box, y: 8 * box }];
+      direction = "right";
+      nextDirection = "right";
+      score = 0;
+      scoreDisplay.textContent = "Pontuação: 0";
+
+      food = {
+        x: Math.floor(Math.random() * totalBoxes) * box,
+        y: Math.floor(Math.random() * totalBoxes) * box
+      };
+
+      clearInterval(gameLoop);
+      gameLoop = setInterval(draw, 150);
+    }
+
+    function draw() {
+      if (isPaused) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let x = 0; x < canvas.width; x += box) {
+        for (let y = 0; y < canvas.height; y += box) {
+          ctx.fillStyle = (x / box + y / box) % 2 === 0 ? "#1a1a1a" : "#111";
+          ctx.fillRect(x, y, box, box);
+        }
+      }
+
+      // Desenhar comida
+      ctx.fillStyle = "red";
+      ctx.shadowColor = "red";
+      ctx.shadowBlur = 10;
+      ctx.fillRect(food.x, food.y, box, box);
+      ctx.shadowBlur = 0;
+
+      // Movimento
+      let head = { x: snake[0].x, y: snake[0].y };
+      direction = nextDirection;
+
+      if (direction === "right") head.x += box;
+      if (direction === "left") head.x -= box;
+      if (direction === "up") head.y -= box;
+      if (direction === "down") head.y += box;
+
+      // Colisão com parede ou corpo
+      if (
+        head.x < 0 || head.x >= canvas.width ||
+        head.y < 0 || head.y >= canvas.height
+      ) return gameOver();
+
+      for (let segment of snake.slice(1)) {
+        if (head.x === segment.x && head.y === segment.y) {
+          return gameOver();
+        }
+      }
+
+      if (head.x === food.x && head.y === food.y) {
+        score++;
+        scoreDisplay.textContent = "Pontuação: " + score;
+        food = {
+          x: Math.floor(Math.random() * totalBoxes) * box,
+          y: Math.floor(Math.random() * totalBoxes) * box
+        };
+      } else {
+        snake.pop();
+      }
+
+      snake.unshift(head);
+
+      // Desenhar cobrinha
+      for (let i = 0; i < snake.length; i++) {
+        if (i === 0) {
+          drawSnakeHead(snake[i].x, snake[i].y, direction);
+        } else {
+          ctx.fillStyle = bodyColor;
+          ctx.fillRect(snake[i].x, snake[i].y, box, box);
+          ctx.strokeStyle = "#000";
+          ctx.strokeRect(snake[i].x, snake[i].y, box, box);
+        }
+      }
+    }
+
+    function drawSnakeHead(x, y, dir) {
+      // Corpo da cabeça
+      ctx.fillStyle = bodyColor;
+      ctx.beginPath();
+      ctx.roundRect(x, y, box, box, 6); // Cabeça com cantos arredondados
+      ctx.fill();
+      ctx.strokeStyle = "#000";
+      ctx.stroke();
+
+      // Olhos
+      ctx.fillStyle = "#fff";
+      let eyeOffsetX = dir === "left" ? -2 : dir === "right" ? 2 : 0;
+      let eyeOffsetY = dir === "up" ? -2 : dir === "down" ? 2 : 0;
+
+      // Esquerdo
+      ctx.beginPath();
+      ctx.arc(x + box * 0.3 + eyeOffsetX, y + box * 0.3 + eyeOffsetY, 2.5, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Direito
+      ctx.beginPath();
+      ctx.arc(x + box * 0.7 + eyeOffsetX, y + box * 0.3 + eyeOffsetY, 2.5, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+
+    function gameOver() {
+      clearInterval(gameLoop);
+      gameOverDiv.style.display = "block";
+      setTimeout(() => returnToMenu(), 3000);
+    }
+
+    function togglePause() {
+      isPaused = !isPaused;
+    }
+
+    function returnToMenu() {
+      clearInterval(gameLoop);
+      canvas.style.display = "none";
+      controls.style.display = "none";
+      scoreDisplay.style.display = "none";
+      gameOverDiv.style.display = "none";
+      menu.style.display = "block";
+      touchControls.style.display = "none";
+    }
+
+    function setDirection(newDirection) {
+      const allowed = {
+        up: direction !== "down",
+        down: direction !== "up",
+        left: direction !== "right",
+        right: direction !== "left"
+      };
+
+      if (allowed[newDirection]) {
+        nextDirection = newDirection;
+      }
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowUp" && direction !== "down") nextDirection = "up";
+      else if (e.key === "ArrowDown" && direction !== "up") nextDirection = "down";
+      else if (e.key === "ArrowLeft" && direction !== "right") nextDirection = "left";
+      else if (e.key === "ArrowRight" && direction !== "left") nextDirection = "right";
+      else if (e.key === " " || e.key === "p") togglePause();
+    });
+
+    // Suporte para ctx.roundRect em navegadores modernos
+    if (!CanvasRenderingContext2D.prototype.roundRect) {
+      CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+        this.beginPath();
+        this.moveTo(x + r, y);
+        this.arcTo(x + w, y, x + w, y + h, r);
+        this.arcTo(x + w, y + h, x, y + h, r);
+        this.arcTo(x, y + h, x, y, r);
+        this.arcTo(x, y, x + w, y, r);
+        this.closePath();
+        return this;
+      };
+    }
+  </script>
+</body>
+</html>
